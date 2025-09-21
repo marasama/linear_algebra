@@ -24,8 +24,17 @@ impl<K: fmt::Debug> fmt::Debug for Vector<K> {
 
 impl<K: fmt::Display> fmt::Display for Vector<K> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for num in &self.data {
-            writeln!(f, "[{}]", num)?;
+        let precision = f.precision().unwrap_or(1);
+
+        let mut width = 0usize;
+        for x in &self.data {
+            let s = format!("{:.*}", precision, *x);
+            width = width.max(s.len());
+        }
+
+        for x in &self.data {
+            let s = format!("{:.*}", precision, *x);
+            writeln!(f, "[ {:>w$} ]", s, w = width)?;
         }
         Ok(())
     }
@@ -79,7 +88,7 @@ mod tests {
         let mut u = Vector::from([2.0f32, 3.0]);
         let v = Vector::from([5.0, 7.0]);
         u.add(&v).unwrap();
-        assert_eq!(format!("{}", u), "[7]\n[10]\n");
+        assert_eq!(format!("{}", u), "[  7.0 ]\n[ 10.0 ]\n");
     }
 
     #[test]
@@ -87,14 +96,14 @@ mod tests {
         let mut u = Vector::from([2.0f32, 3.0]);
         let v = Vector::from([5.0, 7.0]);
         u.sub(&v).unwrap();
-        assert_eq!(format!("{}", u), "[-3]\n[-4]\n");
+        assert_eq!(format!("{}", u), "[ -3.0 ]\n[ -4.0 ]\n");
     }
 
     #[test]
     fn test_scl_f32() {
         let mut u = Vector::from([2.0f32, 3.0]);
         u.scl(2.0);
-        assert_eq!(format!("{}", u), "[4]\n[6]\n");
+        assert_eq!(format!("{}", u), "[ 4.0 ]\n[ 6.0 ]\n");
     }
 
     #[test]
@@ -105,26 +114,45 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // Integers: no fractional part, but still aligned with one leading space
     #[test]
     fn test_add_i32() {
         let mut u = Vector::from([2, 3]);
         let v = Vector::from([5, 7]);
         u.add(&v).unwrap();
-        assert_eq!(format!("{}", u), "[7]\n[10]\n");
+        // width=max(len("7"), len("10"))=2 → " 7" and "10"
+        assert_eq!(format!("{}", u), "[  7 ]\n[ 10 ]\n");
     }
 
     #[test]
     fn test_scl_i32() {
         let mut u = Vector::from([2, 3]);
         u.scl(3);
-        assert_eq!(format!("{}", u), "[6]\n[9]\n");
+        // width=max(len("6"), len("9"))=1 → "6" and "9"
+        assert_eq!(format!("{}", u), "[ 6 ]\n[ 9 ]\n");
     }
 
+    // f64: default precision = 1 → shows .0
     #[test]
     fn test_add_f64() {
         let mut u = Vector::from([1.5f64, 2.5]);
         let v = Vector::from([3.5, 4.5]);
         u.add(&v).unwrap();
-        assert_eq!(format!("{}", u), "[5]\n[7]\n");
+        assert_eq!(format!("{}", u), "[ 5.0 ]\n[ 7.0 ]\n");
+    }
+
+    // Optional: precision override examples (keep if you want to enforce behavior)
+    #[test]
+    fn test_precision_override_f32() {
+        let mut u = Vector::from([2.0f32, 3.0]);
+        u.scl(2.0);
+        assert_eq!(format!("{:.3}", u), "[ 4.000 ]\n[ 6.000 ]\n");
+    }
+
+    #[test]
+    fn test_precision_override_f64() {
+        let mut u = Vector::from([1.25f64, 2.5]);
+        u.add(&Vector::from([3.0, 0.5])).unwrap();
+        assert_eq!(format!("{:.2}", u), "[ 4.25 ]\n[ 3.00 ]\n");
     }
 }
