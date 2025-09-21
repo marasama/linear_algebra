@@ -80,21 +80,20 @@ impl<K: fmt::Display> fmt::Display for Matrix<K> {
         for i in 0..self.rows {
             for j in 0..self.cols {
                 let s = format!("{}", self.data[j + i * self.cols]);
-                if s.len() > col_len[j] {
-                    col_len[j] = s.len(); // <-- index by column
-                }
+                col_len[j] = col_len[j].max(s.len());
             }
         }
 
-        // 2) print rows using those widths
         for i in 0..self.rows {
             write!(f, "[")?;
             for j in 0..self.cols {
-                if j > 0 {
-                    write!(f, " ")?;
-                }
                 let s = format!("{}", self.data[j + i * self.cols]);
-                write!(f, "{:>width$}", s, width = col_len[j])?; // <-- width by column
+                if j == 0 {
+                    write!(f, "{}", s)?;
+                } else {
+                    let width = col_len[j] + 1;
+                    write!(f, "{:>width$}", s, width = width)?;
+                }
             }
             writeln!(f, "]")?;
         }
