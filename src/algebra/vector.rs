@@ -1,5 +1,5 @@
-use std::fmt;
 use std::ops::{Add, Mul, Sub};
+use std::{fmt, result};
 #[derive(Clone)]
 
 pub struct Vector<K> {
@@ -77,6 +77,27 @@ where
             *a = *a * scalar;
         }
     }
+}
+
+fn linear_combination<K>(u: &[Vector<K>], coefs: &[K]) -> Vector<K>
+where
+    K: Copy + Add<Output = K> + Sub<Output = K> + Mul<Output = K>,
+{
+    assert!(
+        u.len() == coefs.len(),
+        "Vectors and coefs must have same length"
+    );
+    assert!(!u.is_empty(), "Input cannot be empty");
+
+    let mut res = u[0].clone();
+    res.scl(coefs[0]);
+
+    for (vec, &coef) in u.iter().skip(1).zip(coefs.iter().skip(1)) {
+        let mut tmp = vec.clone();
+        tmp.scl(coef);
+        res.add(&tmp);
+    }
+    res
 }
 
 #[cfg(test)]
