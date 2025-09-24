@@ -1,9 +1,9 @@
+use std::fmt;
 use std::ops::{Add, Mul, Sub};
-use std::{fmt, result};
 #[derive(Clone)]
 
 pub struct Vector<K> {
-    data: Vec<K>,
+    pub data: Vec<K>,
 }
 
 impl<K> Vector<K> {
@@ -79,7 +79,7 @@ where
     }
 }
 
-fn linear_combination<K>(u: &[Vector<K>], coefs: &[K]) -> Vector<K>
+pub fn linear_combination<K>(u: &[Vector<K>], coefs: &[K]) -> Vector<K>
 where
     K: Copy + Add<Output = K> + Sub<Output = K> + Mul<Output = K>,
 {
@@ -95,7 +95,7 @@ where
     for (vec, &coef) in u.iter().skip(1).zip(coefs.iter().skip(1)) {
         let mut tmp = vec.clone();
         tmp.scl(coef);
-        res.add(&tmp);
+        res.add(&tmp).unwrap();
     }
     res
 }
