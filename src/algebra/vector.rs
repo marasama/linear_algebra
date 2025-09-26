@@ -1,5 +1,5 @@
 use std::clone::Clone;
-use std::cmp::{PartialEq, PartialOrd};
+use std::cmp::PartialEq;
 use std::fmt;
 use std::marker::Copy;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
@@ -145,7 +145,7 @@ where
         assert_eq!(
             self.size(),
             rhs.size(),
-            "Dimension mismatch at (-) operator"
+            "Dimension mismatch at (*) operator"
         );
         Vector {
             data: self
@@ -171,9 +171,50 @@ where
     }
 }
 
-impl<K> AddAssign<K> for Vector<K>
+impl<K> AddAssign<&Vector<K>> for Vector<K>
 where
-    K: AddAssign,
+    K: AddAssign + Copy,
 {
-    fn add_assign(&mut self, rhs: K) {}
+    fn add_assign(&mut self, rhs: &Vector<K>) {
+        assert_eq!(
+            self.size(),
+            rhs.size(),
+            "Dimension mismatch at (+=) operator"
+        );
+        for (a, b) in self.data.iter_mut().zip(&rhs.data) {
+            *a += *b;
+        }
+    }
+}
+
+impl<K> SubAssign<&Vector<K>> for Vector<K>
+where
+    K: SubAssign + Copy + AddAssign,
+{
+    fn sub_assign(&mut self, rhs: &Vector<K>) {
+        assert_eq!(
+            self.size(),
+            rhs.size(),
+            "Dimension mismatch at (+=) operator"
+        );
+        for (a, b) in self.data.iter_mut().zip(&rhs.data) {
+            *a -= *b;
+        }
+    }
+}
+
+impl<K> MulAssign<&Vector<K>> for Vector<K>
+where
+    K: MulAssign + Copy + AddAssign + SubAssign,
+{
+    fn mul_assign(&mut self, rhs: &Vector<K>) {
+        assert_eq!(
+            self.size(),
+            rhs.size(),
+            "Dimension mismatch at (+=) operator"
+        );
+        for (a, b) in self.data.iter_mut().zip(&rhs.data) {
+            *a *= *b;
+        }
+    }
 }
