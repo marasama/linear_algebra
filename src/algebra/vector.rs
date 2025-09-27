@@ -1,26 +1,36 @@
+use num_traits::Float;
 use std::clone::Clone;
 use std::cmp::PartialEq;
 use std::fmt;
 use std::marker::Copy;
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
-use std::process::Output;
-
 #[derive(Clone)]
-struct Vector<K> {
+struct Vector<K: Float> {
     data: Vec<K>,
 }
 
-impl<K> Vector<K> {
+impl<K: Float> Vector<K> {
     pub fn new(data: Vec<K>) -> Vector<K> {
         Vector { data }
     }
 
     pub fn size(&self) -> usize {
+        if self.data.is_empty() {
+            return 0;
+        }
         self.data.len()
     }
 }
 
-impl<K> fmt::Display for Vector<K>
+impl<K: Float, const N: usize> From<[K; N]> for Vector<K> {
+    fn from(value: [K; N]) -> Self {
+        Vector {
+            data: Vec::from(value),
+        }
+    }
+}
+
+impl<K: Float> fmt::Display for Vector<K>
 where
     K: fmt::Display,
 {
@@ -42,7 +52,7 @@ where
     }
 }
 
-impl<K> fmt::Debug for Vector<K>
+impl<K: Float> fmt::Debug for Vector<K>
 where
     K: fmt::Display,
 {
@@ -64,9 +74,9 @@ where
     }
 }
 
-impl<K> Vector<K>
+impl<K: Float> Vector<K>
 where
-    K: Copy + AddAssign + SubAssign + MulAssign + Add + Mul + Sub + Neg,
+    K: Copy + AddAssign + SubAssign + MulAssign,
 {
     pub fn add(&mut self, v: &Vector<K>) {
         assert_eq!(self.size(), v.size(), "Dimension mismatch at vector.add()");
@@ -75,7 +85,7 @@ where
         }
     }
     pub fn sub(&mut self, v: &Vector<K>) {
-        assert_eq!(self.size(), v.size(), "Dimension mismatch at vector.add()");
+        assert_eq!(self.size(), v.size(), "Dimension mismatch at vector.sub()");
         for (a, b) in self.data.iter_mut().zip(&v.data) {
             *a -= *b;
         }
@@ -89,7 +99,7 @@ where
 
 // --------(+) (-) (*) (+=) (-=) (*=)-----------------
 
-impl<K> Add<&Vector<K>> for &Vector<K>
+impl<K: Float> Add<&Vector<K>> for &Vector<K>
 where
     K: Copy + Add<Output = K>,
 {
@@ -112,7 +122,7 @@ where
     }
 }
 
-impl<K> Sub<&Vector<K>> for &Vector<K>
+impl<K: Float> Sub<&Vector<K>> for &Vector<K>
 where
     K: Copy + Sub<Output = K>,
 {
@@ -135,7 +145,7 @@ where
     }
 }
 
-impl<K> Mul<&Vector<K>> for &Vector<K>
+impl<K: Float> Mul<&Vector<K>> for &Vector<K>
 where
     K: Copy + Mul<Output = K>,
 {
@@ -158,7 +168,7 @@ where
     }
 }
 
-impl<K> Neg for &Vector<K>
+impl<K: Float> Neg for &Vector<K>
 where
     K: Copy + Neg<Output = K>,
 {
@@ -171,7 +181,7 @@ where
     }
 }
 
-impl<K> AddAssign<&Vector<K>> for Vector<K>
+impl<K: Float> AddAssign<&Vector<K>> for Vector<K>
 where
     K: AddAssign + Copy,
 {
@@ -187,7 +197,7 @@ where
     }
 }
 
-impl<K> SubAssign<&Vector<K>> for Vector<K>
+impl<K: Float> SubAssign<&Vector<K>> for Vector<K>
 where
     K: SubAssign + Copy + AddAssign,
 {
@@ -203,7 +213,7 @@ where
     }
 }
 
-impl<K> MulAssign<&Vector<K>> for Vector<K>
+impl<K: Float> MulAssign<&Vector<K>> for Vector<K>
 where
     K: MulAssign + Copy + AddAssign + SubAssign,
 {
@@ -216,5 +226,22 @@ where
         for (a, b) in self.data.iter_mut().zip(&rhs.data) {
             *a *= *b;
         }
+    }
+}
+
+impl<K: Float> PartialEq<Vector<K>> for Vector<K>
+where
+    K: Eq,
+{
+    fn eq(&self, other: &Vector<K>) -> bool {
+        if self.size() != other.size() {
+            return false;
+        }
+        for (a, b) in self.data.iter().zip(&other.data) {
+            if a != b {
+                return false;
+            }
+        }
+        true
     }
 }
