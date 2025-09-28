@@ -6,9 +6,9 @@ use std::{
 
 #[derive(Clone)]
 pub struct Matrix<K> {
-    data: Vec<K>,
-    rows: usize,
-    cols: usize,
+    pub data: Vec<K>,
+    pub rows: usize,
+    pub cols: usize,
 }
 
 impl<K: Float> Matrix<K>
