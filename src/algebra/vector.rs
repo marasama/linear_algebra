@@ -21,6 +21,25 @@ impl<K: Float> Vector<K> {
         }
         self.data.len()
     }
+
+    pub fn dot(&self, v: Vector<K>) -> K {
+        assert_eq!(self.size(), v.size(), "Size mismatch at Vector::dot()!");
+        assert!(
+            !(self.data.is_empty() || v.data.is_empty()),
+            "Empty vector input at Vector::dot()!"
+        );
+        let mut sum: K = K::zero();
+        for i in 0..self.size() {
+            sum = self.data[i].mul_add(v.data[i], sum);
+        }
+        sum
+    }
+}
+
+impl<V: Float> Vector<V> {
+    pub fn norm_1<V>(&mut self) {}
+    pub fn norm<V>(&mut self) {}
+    pub fn norm_inf<V>(&mut self) {}
 }
 
 impl<K: Float, const N: usize> From<[K; N]> for Vector<K> {
@@ -476,5 +495,75 @@ mod tests {
         let v1 = v(&[1.0, 2.0, 3.0]);
         let v2 = v(&[4.0, 5.0]); // different size
         let _ = linear_combination(&[v1, v2], &[1.0, 2.0]);
+    }
+
+    // ---- dot product (v is moved) ----
+
+    #[inline]
+    fn approx_eq(a: F, b: F) -> bool {
+        (a - b).abs() <= 1e-6
+    }
+
+    #[test]
+    fn dot_zero_result() {
+        let a = v(&[0.0, 0.0]);
+        let b = v(&[1.0, 1.0]);
+        let d = a.dot(b); // b moved
+        println!("dot([0,0],[1,1]) = {}", d);
+        assert!(approx_eq(d, 0.0));
+    }
+
+    #[test]
+    fn dot_basic_examples() {
+        // [1,1] · [1,1] = 2
+        let a = v(&[1.0, 1.0]);
+        let b = v(&[1.0, 1.0]);
+        let d1 = a.dot(b);
+        println!("dot([1,1],[1,1]) = {}", d1);
+        assert!(approx_eq(d1, 2.0));
+
+        // [-1,6] · [3,2] = -1*3 + 6*2 = 9
+        let c = v(&[-1.0, 6.0]);
+        let d = v(&[3.0, 2.0]);
+        let d2 = c.dot(d);
+        println!("dot([-1,6],[3,2]) = {}", d2);
+        assert!(approx_eq(d2, 9.0));
+    }
+
+    #[test]
+    fn dot_orthogonal_is_zero() {
+        // [1,0,0] · [0,1,0] = 0
+        let ex = v(&[1.0, 0.0, 0.0]);
+        let ey = v(&[0.0, 1.0, 0.0]);
+        let d = ex.dot(ey);
+        println!("dot(ex, ey) = {}", d);
+        assert!(approx_eq(d, 0.0));
+    }
+
+    #[test]
+    fn dot_sign_and_magnitude() {
+        let a = v(&[2.0, -3.0, 4.0]);
+        let b = v(&[-5.0, 6.0, -7.0]);
+        // 2*-5 + (-3)*6 + 4*-7 = -10 -18 -28 = -56
+        let d = a.dot(b);
+        println!("dot([2,-3,4],[-5,6,-7]) = {}", d);
+        assert!(approx_eq(d, -56.0));
+    }
+
+    #[test]
+    #[should_panic(expected = "Size mismatch at Vector::dot()!")]
+    fn dot_dim_mismatch_panics() {
+        let a = v(&[1.0, 2.0]);
+        let b = v(&[3.0]);
+        let _ = a.dot(b); // b moved; mismatched sizes should panic
+    }
+
+    // include this only if your implementation intentionally panics on empty vectors
+    #[test]
+    #[should_panic(expected = "Empty vector input at Vector::dot()!")]
+    fn dot_empty_vectors_panics() {
+        let a = v(&[]);
+        let b = v(&[]);
+        let _ = a.dot(b);
     }
 }
