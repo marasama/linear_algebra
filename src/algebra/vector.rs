@@ -21,25 +21,6 @@ impl<K: Float> Vector<K> {
         }
         self.data.len()
     }
-
-    pub fn dot(&self, v: Vector<K>) -> K {
-        assert_eq!(self.size(), v.size(), "Size mismatch at Vector::dot()!");
-        assert!(
-            !(self.data.is_empty() || v.data.is_empty()),
-            "Empty vector input at Vector::dot()!"
-        );
-        let mut sum: K = K::zero();
-        for i in 0..self.size() {
-            sum = self.data[i].mul_add(v.data[i], sum);
-        }
-        sum
-    }
-}
-
-impl<V: Float> Vector<V> {
-    pub fn norm_1<V>(&mut self) {}
-    pub fn norm<V>(&mut self) {}
-    pub fn norm_inf<V>(&mut self) {}
 }
 
 impl<K: Float, const N: usize> From<[K; N]> for Vector<K> {

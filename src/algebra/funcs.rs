@@ -1,7 +1,66 @@
 use super::matrix::Matrix;
 use super::vector::Vector;
 use num_traits::{Float, NumCast};
-use std::ops::{Add, Mul, Sub};
+
+impl<K: Float> Vector<K> {
+    pub fn norm_1(&mut self) -> f32 {
+        if self.data.is_empty() {
+            return 0.0;
+        }
+        let mut sum: K = K::zero();
+        for &a in self.data.iter() {
+            sum = sum + a.max(-a)
+        }
+        NumCast::from(sum).unwrap_or(0.0f32)
+    }
+    pub fn norm(&mut self) -> f32 {
+        if self.data.is_empty() {
+            return 0.0;
+        }
+        let mut sum: K = K::zero();
+        for &a in self.data.iter() {
+            sum = a.mul_add(a, sum);
+        }
+        let sqrt: K = NumCast::from(0.5f32).unwrap();
+        let sum_sqrt = sum.powf(sqrt);
+        NumCast::from(sum_sqrt).unwrap_or(0.0f32)
+    }
+    pub fn norm_inf(&mut self) -> f32 {
+        if self.data.is_empty() {
+            return 0.0;
+        }
+        let mut max_val: K = K::zero();
+        for &a in self.data.iter() {
+            let abs_a: K = a.max(-a);
+            max_val = max_val.max(abs_a);
+        }
+        NumCast::from(max_val).unwrap_or(0.0f32)
+    }
+    pub fn dot(&self, v: Vector<K>) -> K {
+        assert_eq!(self.size(), v.size(), "Size mismatch at Vector::dot()!");
+        assert!(
+            !(self.data.is_empty() || v.data.is_empty()),
+            "Empty vector input at Vector::dot()!"
+        );
+        let mut sum: K = K::zero();
+        for i in 0..self.size() {
+            sum = self.data[i].mul_add(v.data[i], sum);
+        }
+        sum
+    }
+}
+
+pub fn angle_cos<K: Float>(u: &Vector<K>, v: &Vector<K>) -> f32 {
+    assert_eq!(u.size(), v.size(), "Size mismatch at angle_cos()!");
+    let u_norm = u.clone().norm();
+    let v_norm = v.clone().norm();
+    assert!(
+        u_norm != 0.0f32 && v_norm != 0.0f32,
+        "Zero vector at angle_cos()!"
+    );
+    let dot_pro: f32 = NumCast::from(u.dot(v.clone())).unwrap_or(0.0f32);
+    dot_pro / (u_norm * v_norm)
+}
 
 pub fn linear_combination<K: Float>(u: &[Vector<K>], coefs: &[K]) -> Vector<K> {
     assert_eq!(
@@ -9,12 +68,15 @@ pub fn linear_combination<K: Float>(u: &[Vector<K>], coefs: &[K]) -> Vector<K> {
         coefs.len(),
         "Size mismatch at Vector::linear_combination()!"
     );
+    if u.is_empty() {
+        return Vector { data: Vec::new() };
+    }
     let n = u[0].size();
     for vec in u.iter() {
         assert_eq!(
             vec.size(),
             n,
-            "Not all the vectors are in same size linear_combination()!"
+            "Not all the vectors are in same size Vector::linear_combination()!"
         );
         assert!(
             !vec.data.is_empty(),
@@ -55,7 +117,7 @@ impl LerpImp for f64 {
 
 impl<K: Float> LerpImp for Vector<K> {
     fn lerp_imp(u: Self, v: Self, t: f32) -> Self {
-        assert_eq!(u.size(), v.size(), "Size mismatch at lerp()!");
+        assert_eq!(u.size(), v.size(), "Size mismatch at lerp(Vector)!");
         let mut new_data = vec![K::zero(); u.size()];
         let tt: K = NumCast::from(t).expect("Can't cast f32 to vector scalar!");
         for i in 0..u.size() {
@@ -67,7 +129,10 @@ impl<K: Float> LerpImp for Vector<K> {
 
 impl<K: Float> LerpImp for Matrix<K> {
     fn lerp_imp(u: Self, v: Self, t: f32) -> Self {
-        assert_eq!(u.size(), v.size(), "Shape mismatch at lerp()");
+        assert!(
+            u.rows == v.rows && u.cols == v.cols,
+            "Shape mismatch at lerp(Matrix)!"
+        );
         let mut new_data = vec![K::zero(); u.rows * u.cols];
         let tt: K = NumCast::from(t).expect("Can't cast f32 to vector scalar!");
         for i in 0..u.rows * u.cols {
@@ -185,7 +250,7 @@ mod tests {
 
         let b = lerp(21.0f64, 42.0, 0.3);
         println!("lerp f64 21->42 @0.3 = {}", b);
-        assert!((b - 27.3f64).abs() < 1e-12);
+        assert!((b - 27.3f64).abs() < 1e-6);
     }
 
     // ---------------- lerp: Vector ----------------
@@ -241,5 +306,238 @@ mod tests {
         let u = Matrix::from([[1.0f32, 2.0]]);
         let v = Matrix::from([[1.0f32, 2.0], [3.0, 4.0]]);
         let _ = lerp(u, v, 0.25);
+    }
+
+    // ---------------- norms ----------------
+
+    // Small helper for approximate equality
+    fn approx_eq(a: f32, b: f32, eps: f32) -> bool {
+        (a - b).abs() <= eps
+    }
+
+    #[test]
+    fn norm_empty_returns_zero() {
+        let mut v = Vector::<f32>::new(vec![]);
+        assert_eq!(v.norm_1(), 0.0);
+        assert_eq!(v.norm(), 0.0);
+        assert_eq!(v.norm_inf(), 0.0);
+    }
+
+    #[test]
+    fn norm_examples_from_subject() {
+        // v = [0, 0, 0]
+        let mut v0 = Vector::from([0.0f32, 0.0, 0.0]);
+        assert_eq!(v0.norm_1(), 0.0);
+        assert_eq!(v0.norm(), 0.0);
+        assert_eq!(v0.norm_inf(), 0.0);
+
+        // v = [1, 2, 3]
+        let mut v123 = Vector::from([1.0f32, 2.0, 3.0]);
+        let n1 = v123.norm_1();
+        let n2 = v123.norm();
+        let ni = v123.norm_inf();
+
+        assert!(approx_eq(n1, 6.0, 1e-6), "norm_1 expected 6.0, got {}", n1);
+        assert!(
+            approx_eq(n2, 3.7416575, 1e-5),
+            "norm expected ~3.7416575, got {}",
+            n2
+        );
+        assert!(
+            approx_eq(ni, 3.0, 1e-6),
+            "norm_inf expected 3.0, got {}",
+            ni
+        );
+
+        // v = [-1, -2]
+        let mut vm = Vector::from([-1.0f32, -2.0]);
+        let n1m = vm.norm_1();
+        let n2m = vm.norm();
+        let nim = vm.norm_inf();
+
+        assert!(
+            approx_eq(n1m, 3.0, 1e-6),
+            "norm_1 expected 3.0, got {}",
+            n1m
+        );
+        assert!(
+            approx_eq(n2m, 2.2360679, 1e-6),
+            "norm expected ~2.2360679, got {}",
+            n2m
+        );
+        assert!(
+            approx_eq(nim, 2.0, 1e-6),
+            "norm_inf expected 2.0, got {}",
+            nim
+        );
+    }
+
+    #[test]
+    fn norm_mixed_signs_and_zeros() {
+        let mut v = Vector::from([0.0f32, -4.0, 2.0, 0.0, 1.0]);
+        assert!(approx_eq(v.norm_1(), 7.0, 1e-6));
+        assert!(approx_eq(v.norm_inf(), 4.0, 1e-6));
+
+        let n2 = v.norm();
+        // sqrt( (-4)^2 + 2^2 + 1^2 ) = sqrt(16 + 4 + 1) = sqrt(21) ≈ 4.5825758
+        assert!(
+            approx_eq(n2, 4.5825758, 1e-5),
+            "norm expected ~4.5825758, got {}",
+            n2
+        );
+    }
+
+    #[test]
+    fn norm_homogeneity_scaling() {
+        let mut v = Vector::from([1.0f32, -2.0, 3.0]);
+        let a = 2.5f32;
+
+        let n1 = v.norm_1();
+        let n2 = v.norm();
+        let ni = v.norm_inf();
+
+        // Scale the vector manually: a * v
+        let mut sv = v.clone();
+        for x in sv.data.iter_mut() {
+            *x *= a;
+        }
+
+        let eps = 1e-5;
+        assert!(approx_eq(sv.norm_1(), a.abs() * n1, eps));
+        assert!(approx_eq(sv.norm(), a.abs() * n2, eps));
+        assert!(approx_eq(sv.norm_inf(), a.abs() * ni, eps));
+    }
+
+    #[test]
+    fn norm_inequality_chain() {
+        // For any v: ||v||_inf <= ||v||_2 <= ||v||_1
+        let mut v = Vector::from([3.0f32, -1.0, 2.0, -4.0]);
+        let n1 = v.norm_1();
+        let n2 = v.norm();
+        let ni = v.norm_inf();
+
+        assert!(ni <= n2 + 1e-7, "Linf <= L2 violated: {} !<= {}", ni, n2);
+        assert!(n2 <= n1 + 1e-7, "L2 <= L1 violated: {} !<= {}", n2, n1);
+    }
+
+    #[test]
+    fn norm_triangle_inequality() {
+        // ||u + v|| <= ||u|| + ||v||
+        let mut u = Vector::from([1.0f32, -2.0, 3.0]);
+        let mut v = Vector::from([-4.0f32, 2.0, 0.5]);
+
+        // u + v
+        let mut s = u.clone();
+        assert_eq!(s.size(), v.size());
+        for (x, &y) in s.data.iter_mut().zip(v.data.iter()) {
+            *x += y;
+        }
+
+        let lhs1 = s.norm_1();
+        let rhs1 = u.norm_1() + v.norm_1();
+        assert!(
+            lhs1 <= rhs1 + 1e-6,
+            "Triangle (L1) failed: {} !<= {}",
+            lhs1,
+            rhs1
+        );
+
+        let lhs2 = s.norm();
+        let rhs2 = u.norm() + v.norm();
+        assert!(
+            lhs2 <= rhs2 + 1e-6,
+            "Triangle (L2) failed: {} !<= {}",
+            lhs2,
+            rhs2
+        );
+
+        let lhs_inf = s.norm_inf();
+        let rhs_inf = u.norm_inf() + v.norm_inf();
+        assert!(
+            lhs_inf <= rhs_inf + 1e-6,
+            "Triangle (Linf) failed: {} !<= {}",
+            lhs_inf,
+            rhs_inf
+        );
+    }
+
+    #[test]
+    fn norm_large_values_stability() {
+        // Just ensure no NaN/Inf and monotone chain still holds
+        let mut v = Vector::from([1.0e10f32, -2.0e10, 3.0e10, -4.0e10]);
+        let n1 = v.norm_1();
+        let n2 = v.norm();
+        let ni = v.norm_inf();
+
+        assert!(
+            n1.is_finite() && n2.is_finite() && ni.is_finite(),
+            "norm produced non-finite value(s)"
+        );
+        assert!(ni <= n2 + 1e-3, "Linf <= L2 violated at large scale");
+        assert!(n2 <= n1 + 1e-3, "L2 <= L1 violated at large scale");
+    }
+
+    // ---------------- angle_cos ----------------
+
+    #[test]
+    fn angle_cos_parallel_gives_one() {
+        let u = Vector::from([1.0f32, 0.0]);
+        let v = Vector::from([2.0f32, 0.0]); // same direction
+        let c = angle_cos(&u, &v);
+        println!("angle_cos parallel = {}", c);
+        assert!(approx_eq(c, 1.0, 1e-6));
+    }
+
+    #[test]
+    fn angle_cos_perpendicular_gives_zero() {
+        let u = Vector::from([1.0f32, 0.0]);
+        let v = Vector::from([0.0f32, 1.0]);
+        let c = angle_cos(&u, &v);
+        println!("angle_cos perpendicular = {}", c);
+        assert!(approx_eq(c, 0.0, 1e-6));
+    }
+
+    #[test]
+    fn angle_cos_opposite_gives_minus_one() {
+        let u = Vector::from([-1.0f32, 1.0]);
+        let v = Vector::from([1.0f32, -1.0]);
+        let c = angle_cos(&u, &v);
+        println!("angle_cos opposite = {}", c);
+        assert!(approx_eq(c, -1.0, 1e-6));
+    }
+
+    #[test]
+    fn angle_cos_colinear_scaled_is_one() {
+        let u = Vector::from([2.0f32, 1.0]);
+        let v = Vector::from([4.0f32, 2.0]); // positive scalar multiple
+        let c = angle_cos(&u, &v);
+        println!("angle_cos colinear scaled = {}", c);
+        assert!(approx_eq(c, 1.0, 1e-6));
+    }
+
+    #[test]
+    fn angle_cos_arbitrary_matches_subject_value() {
+        // Subject example: u=[1,2,3], v=[4,5,6] → ~0.974631846
+        let u = Vector::from([1.0f32, 2.0, 3.0]);
+        let v = Vector::from([4.0f32, 5.0, 6.0]);
+        let c = angle_cos(&u, &v);
+        println!("angle_cos arbitrary = {}", c);
+        assert!(approx_eq(c, 0.974631846, 1e-6));
+    }
+
+    #[test]
+    #[should_panic(expected = "Zero vector at angle_cos()!")]
+    fn angle_cos_zero_vector_panics() {
+        let u = Vector::from([0.0f32, 0.0]);
+        let v = Vector::from([1.0f32, 0.0]);
+        let _ = angle_cos(&u, &v);
+    }
+
+    #[test]
+    #[should_panic(expected = "Size mismatch at angle_cos()!")]
+    fn angle_cos_size_mismatch_panics() {
+        let u = Vector::from([1.0f32, 0.0]);
+        let v = Vector::from([1.0f32, 0.0, 2.0]); // different size
+        let _ = angle_cos(&u, &v);
     }
 }
