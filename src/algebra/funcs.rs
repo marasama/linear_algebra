@@ -62,6 +62,18 @@ pub fn angle_cos<K: Float>(u: &Vector<K>, v: &Vector<K>) -> f32 {
     dot_pro / (u_norm * v_norm)
 }
 
+pub fn cross_product<K: Float>(u: &Vector<K>, v: &Vector<K>) -> Vector<K> {
+    assert!(
+        u.size() == 3 && v.size() == 3,
+        "Vectors must be 3 dimensional at cross_product()!"
+    );
+    let mut cross = Vector::new(vec![K::zero(); 3]);
+    cross.data[0] = u.data[1].mul_add(v.data[2], -(u.data[2] * v.data[1]));
+    cross.data[1] = u.data[2].mul_add(v.data[0], -(u.data[0] * v.data[2]));
+    cross.data[2] = u.data[0].mul_add(v.data[1], -(u.data[1] * v.data[0]));
+    cross
+}
+
 pub fn linear_combination<K: Float>(u: &[Vector<K>], coefs: &[K]) -> Vector<K> {
     assert_eq!(
         u.len(),
@@ -539,5 +551,84 @@ mod tests {
         let u = Vector::from([1.0f32, 0.0]);
         let v = Vector::from([1.0f32, 0.0, 2.0]); // different size
         let _ = angle_cos(&u, &v);
+    }
+
+    // ---------------- cross_product ----------------
+
+    // Small helper for approximate equality on f32
+
+    #[test]
+    fn cross_axes_unit_example() {
+        // [0,0,1] x [1,0,0] = [0,1,0]
+        let u = Vector::from([0.0f32, 0.0, 1.0]);
+        let v = Vector::from([1.0f32, 0.0, 0.0]);
+        let r = cross_product(&u, &v);
+
+        let exp = Vector::from([0.0f32, 1.0, 0.0]);
+        assert_eq!(svec(&r), svec(&exp));
+    }
+
+    #[test]
+    fn cross_arbitrary_from_subject_1() {
+        // [1,2,3] x [4,5,6] = [-3,6,-3]
+        let u = Vector::from([1.0f32, 2.0, 3.0]);
+        let v = Vector::from([4.0f32, 5.0, 6.0]);
+        let r = cross_product(&u, &v);
+
+        let exp = Vector::from([-3.0f32, 6.0, -3.0]);
+        assert_eq!(svec(&r), svec(&exp));
+    }
+
+    #[test]
+    fn cross_arbitrary_from_subject_2() {
+        // [4,2,-3] x [-2,-5,16] = [17,-58,-16]
+        let u = Vector::from([4.0f32, 2.0, -3.0]);
+        let v = Vector::from([-2.0f32, -5.0, 16.0]);
+        let r = cross_product(&u, &v);
+
+        let exp = Vector::from([17.0f32, -58.0, -16.0]);
+        assert_eq!(svec(&r), svec(&exp));
+    }
+
+    #[test]
+    fn cross_is_perpendicular_to_operands() {
+        let u = Vector::from([1.0f32, 2.0, 3.0]);
+        let v = Vector::from([4.0f32, -1.0, 2.0]);
+        let r = cross_product(&u, &v);
+
+        // u · (u × v) = 0 and v · (u × v) = 0
+        let d1: f32 = num_traits::NumCast::from(u.dot(r.clone())).unwrap();
+        let d2: f32 = num_traits::NumCast::from(v.dot(r.clone())).unwrap();
+        assert!(approx_eq(d1, 0.0, 1e-5), "u·(u×v) expected 0, got {}", d1);
+        assert!(approx_eq(d2, 0.0, 1e-5), "v·(u×v) expected 0, got {}", d2);
+    }
+
+    #[test]
+    fn cross_is_anticommutative() {
+        let u = Vector::from([2.0f32, -3.0, 4.0]);
+        let v = Vector::from([1.0f32, 5.0, -2.0]);
+
+        let uv = cross_product(&u, &v);
+        let vu = cross_product(&v, &u);
+
+        // vu should be -uv
+        let neg_uv = Vector::from([-uv.data[0], -uv.data[1], -uv.data[2]]);
+        assert_eq!(svec(&vu), svec(&neg_uv));
+    }
+
+    #[test]
+    #[should_panic(expected = "Vectors must be 3 dimensional at cross_product()!")]
+    fn cross_panics_for_2d_vectors() {
+        let u = Vector::from([1.0f32, 2.0]); // not 3D
+        let v = Vector::from([3.0f32, 4.0]); // not 3D
+        let _ = cross_product(&u, &v);
+    }
+
+    #[test]
+    #[should_panic(expected = "Vectors must be 3 dimensional at cross_product()!")]
+    fn cross_panics_for_4d_vectors() {
+        let u = Vector::from([1.0f32, 2.0, 3.0, 4.0]); // not 3D
+        let v = Vector::from([0.0f32, 1.0, 0.0, 0.0]); // not 3D
+        let _ = cross_product(&u, &v);
     }
 }
