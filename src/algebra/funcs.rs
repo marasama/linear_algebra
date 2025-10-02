@@ -50,6 +50,49 @@ impl<K: Float> Vector<K> {
     }
 }
 
+impl<K: Float> Matrix<K> {
+    pub fn mul_vec(&mut self, vec: Vector<K>) -> Vector<K> {
+        assert_eq!(
+            self.cols,
+            vec.size(),
+            "MxN matrix need R^N vector to multiply in Matrix::mul_vec()!"
+        );
+        let mut new_vec = vec![K::zero(); self.rows];
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                new_vec[i] = vec.data[j].mul_add(self.data[i * self.cols + j], new_vec[i]);
+            }
+        }
+        Vector { data: new_vec }
+    }
+    pub fn mul_mat(&mut self, mat: Matrix<K>) -> Matrix<K> {
+        assert_eq!(
+            self.cols, mat.rows,
+            "MxN matrix need NxP matrix to multiply in Matrix::mul_mat()!"
+        );
+        let M = self.rows;
+        let N = self.cols;
+        let P = mat.cols;
+        let mut new_mat = vec![K::zero(); M * P];
+        for i in 0..M {
+            for j in 0..P {
+                let mut acc = K::zero();
+                for k in 0..N {
+                    let a_ik: K = self.data[i * N + k];
+                    let b_kj: K = mat.data[k * P + j];
+                    acc = a_ik.mul_add(b_kj, acc);
+                }
+                new_mat[i * P + j] = acc;
+            }
+        }
+        Matrix {
+            data: new_mat,
+            rows: M,
+            cols: P,
+        }
+    }
+}
+
 pub fn angle_cos<K: Float>(u: &Vector<K>, v: &Vector<K>) -> f32 {
     assert_eq!(u.size(), v.size(), "Size mismatch at angle_cos()!");
     let u_norm = u.clone().norm();
@@ -630,5 +673,152 @@ mod tests {
         let u = Vector::from([1.0f32, 2.0, 3.0, 4.0]); // not 3D
         let v = Vector::from([0.0f32, 1.0, 0.0, 0.0]); // not 3D
         let _ = cross_product(&u, &v);
+    }
+
+    // --- tiny helpers --------------------------------------------------------
+    type F = f32;
+    fn feq(a: F, b: F, eps: F) -> bool {
+        (a - b).abs() <= eps
+    }
+    fn assert_vec_eq_eps(got: &Vector<F>, want: &[F], eps: F) {
+        assert_eq!(got.size(), want.len(), "vector length mismatch");
+        for (i, (g, w)) in got.data.iter().zip(want.iter()).enumerate() {
+            assert!(feq(*g, *w, eps), "vec[{}]: got {}, want {}", i, g, w);
+        }
+    }
+    fn assert_mat_eq_eps(got: &Matrix<F>, want: &[&[F]], eps: F) {
+        assert_eq!(got.rows, want.len(), "rows mismatch");
+        assert_eq!(got.cols, want[0].len(), "cols mismatch");
+        for i in 0..got.rows {
+            for j in 0..got.cols {
+                let g = got.data[i * got.cols + j];
+                let w = want[i][j];
+                assert!(feq(g, w, eps), "mat[{},{}]: got {}, want {}", i, j, g, w);
+            }
+        }
+    }
+
+    // shorthands to build vectors/matrices in row-major for tests
+    fn v(xs: &[F]) -> Vector<F> {
+        Vector::new(xs.to_vec())
+    }
+    fn m(rows: usize, cols: usize, data_row_major: &[F]) -> Matrix<F> {
+        assert_eq!(rows * cols, data_row_major.len());
+        Matrix {
+            rows,
+            cols,
+            data: data_row_major.to_vec(),
+        }
+    }
+
+    const EPS: F = 1e-5;
+
+    // --- mul_vec -------------------------------------------------------------
+
+    #[test]
+    fn mul_vec_identity_2x2() {
+        let mut a = m(2, 2, &[1., 0., 0., 1.]);
+        let x = v(&[4., 2.]);
+        let y = a.mul_vec(x.clone());
+        assert_vec_eq_eps(&y, &[4., 2.], EPS);
+    }
+
+    #[test]
+    fn mul_vec_diagonal_scales() {
+        let mut a = m(3, 3, &[2., 0., 0., 0., 3., 0., 0., 0., -1.]);
+        let x = v(&[1., 2., -5.]);
+        let y = a.mul_vec(x.clone());
+        assert_vec_eq_eps(&y, &[2., 6., 5.], EPS);
+    }
+
+    #[test]
+    fn mul_vec_nonsquare_2x3_times_r3() {
+        // A (2x3) * v (3) -> (2)
+        let mut a = m(2, 3, &[1., 2., 3., 4., 5., 6.]);
+        let x = v(&[7., 8., 9.]);
+        let y = a.mul_vec(x.clone());
+        assert_vec_eq_eps(&y, &[50., 122.], EPS);
+    }
+
+    #[test]
+    #[should_panic(expected = "Matrix::mul_vec")]
+    fn mul_vec_dimension_mismatch_panics() {
+        let mut a = m(2, 3, &[1., 2., 3., 4., 5., 6.]);
+        let x = v(&[1., 2.]); // len 2, needs 3
+        let _ = a.mul_vec(x.clone());
+    }
+
+    // --- mul_mat -------------------------------------------------------------
+
+    #[test]
+    fn mul_mat_identity_right() {
+        // A * I = A
+        let mut a = m(2, 2, &[3., -5., 6., 8.]);
+        let i = m(2, 2, &[1., 0., 0., 1.]);
+        let c = a.mul_mat(i.clone());
+        assert_mat_eq_eps(&c, &[&[3., -5.], &[6., 8.]], EPS);
+    }
+
+    #[test]
+    fn mul_mat_identity_left() {
+        // I * B = B
+        let mut i = m(2, 2, &[1., 0., 0., 1.]);
+        let b = m(2, 2, &[2., 1., 4., 2.]);
+        let c = i.mul_mat(b.clone());
+        assert_mat_eq_eps(&c, &[&[2., 1.], &[4., 2.]], EPS);
+    }
+
+    #[test]
+    fn mul_mat_nonsquare_2x3_times_3x2() {
+        // (2x3) * (3x2) -> (2x2)
+        let mut a = m(2, 3, &[1., 2., 3., 4., 5., 6.]);
+        let b = m(3, 2, &[7., 8., 9., 10., 11., 12.]);
+        let c = a.mul_mat(b.clone());
+        assert_mat_eq_eps(&c, &[&[58., 64.], &[139., 154.]], EPS);
+    }
+
+    #[test]
+    fn mul_mat_nonsquare_3x2_times_2x4() {
+        // (3x2) * (2x4) -> (3x4)
+        let mut a = m(3, 2, &[1., 4., 2., 5., 3., 6.]);
+        let b = m(2, 4, &[7., 8., 9., 10., 11., 12., 13., 14.]);
+        let c = a.mul_mat(b.clone());
+        assert_mat_eq_eps(
+            &c,
+            &[
+                &[51., 56., 61., 66.],
+                &[69., 76., 83., 90.],
+                &[87., 96., 105., 114.],
+            ],
+            EPS,
+        );
+    }
+
+    #[test]
+    fn mul_mat_associativity_with_vec() {
+        // (A * B) * v == A * (B * v)
+        let mut a = m(2, 3, &[1., 2., 0., 0., 1., 1.]);
+        let b = m(3, 2, &[2., 1., 3., 0., 4., -1.]);
+        let v = v(&[1., 2.]);
+        let left = a.mul_mat(b.clone()).mul_vec(v.clone());
+        let right = a.mul_vec(b.clone().mul_vec(v.clone()));
+        assert_vec_eq_eps(&left, &right.data, EPS);
+    }
+
+    #[test]
+    fn mul_mat_with_zero_matrix() {
+        let mut a = m(2, 3, &[1., 2., 3., 4., 5., 6.]);
+        let z = m(3, 4, &[0.; 12]);
+        let c = a.mul_mat(z.clone());
+        assert_mat_eq_eps(&c, &[&[0., 0., 0., 0.], &[0., 0., 0., 0.]], EPS);
+    }
+
+    #[test]
+    #[should_panic(expected = "Matrix::mul_mat")]
+    fn mul_mat_dimension_mismatch_panics() {
+        // cols(A)=3, rows(B)=4 -> should panic
+        let mut a = m(2, 3, &[1., 2., 3., 4., 5., 6.]);
+        let b = m(4, 2, &[1., 2., 3., 4., 5., 6., 7., 8.]);
+        let _ = a.mul_mat(b.clone());
     }
 }
