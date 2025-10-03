@@ -105,6 +105,18 @@ impl<K: Float> Matrix<K> {
         }
         trace
     }
+    pub fn transpose(&mut self) -> Matrix<K> {
+        if self.data.is_empty() {
+            return Matrix::new(vec![], 0, 0);
+        }
+        let mut trans = Matrix::new(vec![K::zero(); self.cols * self.rows], self.cols, self.rows);
+        for r in 0..trans.rows {
+            for c in 0..trans.cols {
+                trans.data[c + r * trans.cols] = self.data[r + c * trans.rows];
+            }
+        }
+        trans
+    }
 }
 
 pub fn angle_cos<K: Float>(u: &Vector<K>, v: &Vector<K>) -> f32 {
@@ -899,5 +911,115 @@ mod tests {
     fn test_trace_single_element_matrix() {
         let mut mat = create_matrix(vec![vec![42.0]]);
         assert_eq!(mat.trace(), 42.0); // Trace of a 1x1 matrix is the only element
+    }
+
+    //--------- transpose -------------------------
+    // Helper function to create a matrix
+
+    // Test 1: Square matrix (3x3)
+    #[test]
+    fn test_transpose_square_3x3() {
+        let mut mat = m(3, 3, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]);
+        let transposed = mat.transpose();
+        assert_eq!(
+            transposed.data,
+            vec![1.0, 4.0, 7.0, 2.0, 5.0, 8.0, 3.0, 6.0, 9.0]
+        );
+        assert_eq!(transposed.rows, 3);
+        assert_eq!(transposed.cols, 3);
+    }
+
+    // Test 2: Single row matrix (1x5)
+    #[test]
+    fn test_transpose_single_row() {
+        let mut mat = m(1, 5, &[1.0, 2.0, 3.0, 4.0, 5.0]);
+        let transposed = mat.transpose();
+        assert_eq!(transposed.data, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(transposed.rows, 5);
+        assert_eq!(transposed.cols, 1);
+    }
+
+    // Test 3: Single column matrix (5x1)
+    #[test]
+    fn test_transpose_single_column() {
+        let mut mat = m(5, 1, &[1.0, 2.0, 3.0, 4.0, 5.0]);
+        let transposed = mat.transpose();
+        assert_eq!(transposed.data, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert_eq!(transposed.rows, 1);
+        assert_eq!(transposed.cols, 5);
+    }
+
+    // Test 4: Square matrix (4x4)
+    #[test]
+    fn test_transpose_square_4x4() {
+        let mut mat = m(
+            4,
+            4,
+            &[
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+                16.0,
+            ],
+        );
+        let transposed = mat.transpose();
+        assert_eq!(
+            transposed.data,
+            vec![
+                1.0, 5.0, 9.0, 13.0, 2.0, 6.0, 10.0, 14.0, 3.0, 7.0, 11.0, 15.0, 4.0, 8.0, 12.0,
+                16.0
+            ]
+        );
+        assert_eq!(transposed.rows, 4);
+        assert_eq!(transposed.cols, 4);
+    }
+
+    // Test 5: Rectangular matrix (4x2)
+    #[test]
+    fn test_transpose_rectangular_4x2() {
+        let mut mat = m(4, 2, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
+        let transposed = mat.transpose();
+
+        // This is the correct flattened data for the 2x4 transposed matrix
+        let expected_data = vec![1.0, 3.0, 5.0, 7.0, 2.0, 4.0, 6.0, 8.0];
+
+        assert_eq!(transposed.data, expected_data);
+        assert_eq!(transposed.rows, 2);
+        assert_eq!(transposed.cols, 4);
+    }
+
+    // Test 6: 1x1 matrix (smallest possible matrix)
+    #[test]
+    fn test_transpose_1x1() {
+        let mut mat = m(1, 1, &[42.0]);
+        let transposed = mat.transpose();
+        assert_eq!(transposed.data, vec![42.0]);
+        assert_eq!(transposed.rows, 1);
+        assert_eq!(transposed.cols, 1);
+    }
+
+    // Test 7: Matrix with negative values
+    #[test]
+    fn test_transpose_with_negatives() {
+        let mut mat = m(2, 3, &[-1.0, 2.0, -3.0, 4.0, -5.0, 6.0]);
+        let transposed = mat.transpose();
+
+        // Correct the expected vector to match the actual correct transpose
+        let expected = vec![-1.0, 4.0, 2.0, -5.0, -3.0, 6.0];
+
+        assert_eq!(transposed.data, expected);
+        assert_eq!(transposed.rows, 3);
+        assert_eq!(transposed.cols, 2);
+    }
+
+    // Test 8: Identity matrix (3x3)
+    #[test]
+    fn test_transpose_identity() {
+        let mut mat = m(3, 3, &[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
+        let transposed = mat.transpose();
+        assert_eq!(
+            transposed.data,
+            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        );
+        assert_eq!(transposed.rows, 3);
+        assert_eq!(transposed.cols, 3);
     }
 }
