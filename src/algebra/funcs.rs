@@ -91,6 +91,20 @@ impl<K: Float> Matrix<K> {
             cols: P,
         }
     }
+    pub fn trace(&mut self) -> K {
+        if self.data.is_empty() {
+            return K::zero();
+        }
+        assert_eq!(
+            self.cols, self.rows,
+            "Must be NxN matrix to calculate the trace at trace()!"
+        );
+        let mut trace = K::zero();
+        for a in 0..self.cols {
+            trace = trace + self.data[a * self.cols + a];
+        }
+        trace
+    }
 }
 
 pub fn angle_cos<K: Float>(u: &Vector<K>, v: &Vector<K>) -> f32 {
@@ -820,5 +834,70 @@ mod tests {
         let mut a = m(2, 3, &[1., 2., 3., 4., 5., 6.]);
         let b = m(4, 2, &[1., 2., 3., 4., 5., 6., 7., 8.]);
         let _ = a.mul_mat(b.clone());
+    }
+
+    //----------- trace ----------------------
+    // Helper function to create a matrix from a 2D vector (for testing purposes)
+    fn create_matrix(data: Vec<Vec<f32>>) -> Matrix<f32> {
+        let rows = data.len();
+        let cols = data[0].len();
+        let mut flattened = Vec::new();
+        for row in data {
+            flattened.extend(row);
+        }
+        Matrix {
+            data: flattened,
+            rows,
+            cols,
+        }
+    }
+
+    #[test]
+    fn test_trace_square_matrix() {
+        let mut mat = create_matrix(vec![
+            vec![1.0, 2.0, 3.0],
+            vec![4.0, 5.0, 6.0],
+            vec![7.0, 8.0, 9.0],
+        ]);
+        assert_eq!(mat.trace(), 15.0); // Trace is 1 + 5 + 9 = 15
+    }
+
+    #[test]
+    fn test_trace_empty_matrix() {
+        let mut mat: Matrix<f32> = Matrix::new(vec![], 0, 0);
+        assert_eq!(mat.trace(), 0.0); // Empty matrix should return trace 0
+    }
+
+    #[test]
+    fn test_trace_identity_matrix() {
+        let mut mat = create_matrix(vec![
+            vec![1.0, 0.0, 0.0],
+            vec![0.0, 1.0, 0.0],
+            vec![0.0, 0.0, 1.0],
+        ]);
+        assert_eq!(mat.trace(), 3.0); // Trace of identity matrix is n (size of the matrix)
+    }
+
+    #[test]
+    fn test_trace_negative_elements() {
+        let mut mat = create_matrix(vec![
+            vec![-1.0, -2.0, -3.0],
+            vec![-4.0, -5.0, -6.0],
+            vec![-7.0, -8.0, -9.0],
+        ]);
+        assert_eq!(mat.trace(), -15.0); // Trace is -1 + (-5) + (-9) = -15
+    }
+
+    #[test]
+    #[should_panic(expected = "Must be NxN matrix to calculate the trace at trace()!")]
+    fn test_trace_non_square_matrix() {
+        let mut mat = create_matrix(vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]]);
+        mat.trace(); // This should panic since it's not a square matrix
+    }
+
+    #[test]
+    fn test_trace_single_element_matrix() {
+        let mut mat = create_matrix(vec![vec![42.0]]);
+        assert_eq!(mat.trace(), 42.0); // Trace of a 1x1 matrix is the only element
     }
 }
