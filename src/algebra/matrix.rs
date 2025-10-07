@@ -1,4 +1,4 @@
-use num_traits::Float;
+use num_traits::{Float, NumCast};
 use std::{
     fmt::{self, Display},
     ops::{AddAssign, MulAssign, SubAssign},
@@ -46,8 +46,6 @@ where
     }
 }
 
-// ------------------------READ ONLY FUNCTIONS----------------------------
-
 impl<K: Float> Matrix<K> {
     pub fn new(m: Vec<K>, r: usize, c: usize) -> Self {
         assert_eq!(
@@ -60,6 +58,28 @@ impl<K: Float> Matrix<K> {
         );
         Self {
             data: m,
+            rows: r,
+            cols: c,
+        }
+    }
+    pub fn zero(r: usize, c: usize) -> Self {
+        Self {
+            data: vec![K::zero(); r * c],
+            rows: r,
+            cols: c,
+        }
+    }
+    pub fn identity(r: usize, c: usize) -> Self {
+        assert_eq!(
+            r, c,
+            "An identity matrix's rows and columns must be equal at Matrix::identity()!"
+        );
+        let mut id = vec![K::zero(); r * c];
+        for i in 0..r {
+            id[i + i * c] = K::one();
+        }
+        Matrix {
+            data: id,
             rows: r,
             cols: c,
         }

@@ -117,6 +117,33 @@ impl<K: Float> Matrix<K> {
         }
         trans
     }
+    fn sub_det(&self) -> K {
+        self.data[0].mul_add(self.data[3], -self.data[1] * self.data[3])
+    }
+    fn sub_matrix(&self, row_to_skip: usize, col_to_skip: usize) -> Matrix<K> {
+        let mut sub_mat = vec![K::zero(); (self.rows - 1) * (self.cols - 1)];
+        for r in 0..self.rows {
+            for c in 0..self.cols {}
+        }
+        Matrix {
+            data: sub_mat,
+            rows: self.rows - 1,
+            cols: self.cols - 1,
+        }
+    }
+    pub fn determinant(&mut self) -> K {
+        assert_eq!(
+            self.rows, self.cols,
+            "Matrix must be NxN size to compute determinant at Matrix::determinant()!"
+        );
+
+        if self.rows == 1 {
+            return self.data[0];
+        } else if self.rows == 2 {
+            return self.sub_det();
+        } else {
+        }
+    }
 }
 
 pub fn angle_cos<K: Float>(u: &Vector<K>, v: &Vector<K>) -> f32 {
