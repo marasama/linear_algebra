@@ -36,17 +36,13 @@ impl<K: Float> Vector<K> {
         }
         NumCast::from(max_val).unwrap_or(0.0f32)
     }
-    pub fn dot(&self, v: Vector<K>) -> K {
-        assert_eq!(self.size(), v.size(), "Size mismatch at Vector::dot()!");
-        assert!(
-            !(self.data.is_empty() || v.data.is_empty()),
-            "Empty vector input at Vector::dot()!"
-        );
-        let mut sum: K = K::zero();
-        for i in 0..self.size() {
-            sum = self.data[i].mul_add(v.data[i], sum);
-        }
-        sum
+}
+
+impl<K: Float> Matrix<K> {
+    pub fn row_echolon(&mut self) -> Matrix<K> {
+        let mut r_e = self.clone();
+
+        r_e
     }
 }
 
