@@ -51,14 +51,6 @@ impl<K: Float> Vector<K> {
 }
 
 impl<K: Float> Matrix<K> {
-    pub fn row_echolon(&mut self) -> Matrix<K> {
-        let mut r_e = self.clone();
-
-        r_e
-    }
-}
-
-impl<K: Float> Matrix<K> {
     pub fn mul_vec(&mut self, vec: Vector<K>) -> Vector<K> {
         assert_eq!(
             self.cols,
@@ -125,8 +117,131 @@ impl<K: Float> Matrix<K> {
         }
         trans
     }
-    fn sub_det(&self) -> K {
-        self.data[0].mul_add(self.data[3], -self.data[1] * self.data[3])
+}
+impl<K: Float> Matrix<K> {
+    pub fn swap_rows(&mut self, row1: usize, row2: usize) {
+        assert!(
+            row1 < self.rows && row2 < self.rows,
+            "Wrong line input at Matrix::switch_rows()!"
+        );
+        if row1 == row2 {
+            return;
+        }
+        for col in 0..self.cols {
+            self.data
+                .swap(row1 * self.cols + col, row2 * self.cols + col);
+
+            //let temp: K = self.data[i + row1 * self.cols];
+            //self.data[i + row1 * self.cols] = self.data[i + row2 * self.cols];
+            //self.data[i + row2 * self.cols] = temp;
+
+            //self.data[i + row1 * self.cols] =
+            //    self.data[i + row1 * self.cols] + self.data[i + row2 * self.cols];
+            //self.data[i + row2 * self.cols] =
+            //    self.data[i + row1 * self.cols] - self.data[i + row2 * self.cols];
+            //self.data[i + row1 * self.cols] =
+            //    self.data[i + row1 * self.cols] - self.data[i + row2 * self.cols];
+        }
+    }
+    pub fn row_echelon(&mut self) -> Matrix<K> {
+        let mut pivot_row = 0;
+        let mut pivot_col = 0;
+        while pivot_row < self.rows && pivot_col < self.cols {
+            if let Some(i) = (pivot_row..self.rows)
+                .position(|r| self.data[r * self.cols + pivot_col] != K::zero())
+            {
+                self.swap_rows(pivot_row, pivot_row + i);
+                let pivot_val = self.data[pivot_row * self.cols + pivot_col];
+                for j in pivot_col..self.cols {
+                    self.data[pivot_row * self.cols + j] =
+                        self.data[pivot_row * self.cols + j] / pivot_val;
+                }
+                for l in (pivot_row + 1)..self.rows {
+                    let factor = self.data[l * self.cols + pivot_col];
+                    for m in pivot_col..self.cols {
+                        let subtrahend = factor * self.data[pivot_row * self.cols + m];
+                        //println!("subtrahend: {}", subtrahend);
+                        self.data[l * self.cols + m] = self.data[l * self.cols + m] - subtrahend;
+                    }
+                }
+                //println!(
+                //    "pivot_row: {} pivot_col: {}\n{:.3}",
+                //    pivot_row, pivot_col, self
+                //);
+                pivot_row += 1;
+            }
+            pivot_col += 1;
+        }
+        self.clone()
+    }
+    pub fn gaussian_elimination(&mut self) -> Self {
+        let mut pivot_row = 0;
+        let mut pivot_col = 0;
+        while pivot_row < self.rows && pivot_col < self.cols {
+            if let Some(i) = (pivot_row..self.rows)
+                .position(|r| self.data[r * self.cols + pivot_col] != K::zero())
+            {
+                self.swap_rows(pivot_row, pivot_row + i);
+
+                for l in (pivot_row + 1)..self.rows {
+                    let factor = self.data[l * self.cols + pivot_col]
+                        / self.data[pivot_row * self.cols + pivot_col];
+                    for m in pivot_col..self.cols {
+                        let subtrahend = factor * self.data[pivot_row * self.cols + m];
+                        self.data[l * self.cols + m] = self.data[l * self.cols + m] - subtrahend;
+                    }
+                }
+                pivot_row += 1;
+            }
+            pivot_col += 1;
+        }
+        self.clone()
+    }
+    pub fn determinant(&mut self) -> K {
+        assert_eq!(
+            self.cols, self.rows,
+            "Matrix size must NxN at Matrix::determinant()!"
+        );
+        // Swap rows --> Multiply determinant with -1;
+        // Multiply a row with k --> Multiply determinant with k;
+        // Adding a multiple of one row to another --> Doesnt effect the determinant;
+        let mut det: K = K::one();
+        let mut mat = self.clone();
+        let mut swap_count = 0;
+
+        for pivot_row in 0..mat.rows {
+            let mut pivot = pivot_row;
+            while pivot < mat.rows && mat.data[pivot * mat.cols + pivot_row] == K::zero() {
+                pivot += 1;
+            }
+
+            if pivot == mat.rows {
+                return K::zero();
+            }
+
+            if pivot != pivot_row {
+                mat.swap_rows(pivot_row, pivot);
+                swap_count += 1;
+            }
+
+            let pivot_val = mat.data[pivot_row * mat.cols + pivot_row];
+            for r in (pivot_row + 1)..mat.cols {
+                let factor = mat.data[r * mat.cols + pivot_row] / pivot_val;
+                for c in pivot_row..mat.cols {
+                    let idx = r * mat.cols + c;
+                    mat.data[idx] = mat.data[idx] - factor * mat.data[pivot_row * mat.cols + c];
+                }
+            }
+        }
+        for i in 0..mat.cols {
+            det = det * mat.data[i * self.cols + i];
+        }
+
+        if swap_count % 2 == 1 {
+            det = K::zero() - det;
+        }
+
+        det
     }
 }
 
@@ -1032,5 +1147,136 @@ mod tests {
         );
         assert_eq!(transposed.rows, 3);
         assert_eq!(transposed.cols, 3);
+    }
+
+    // ---------- row-echelon --------------------
+    #[test]
+    fn test_identity_matrix() {
+        let mut mat = Matrix::from([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
+        let ref_mat = mat.row_echelon();
+        assert_eq!(
+            ref_mat.data,
+            vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        );
+    }
+
+    #[test]
+    fn test_simple_2x2() {
+        let mut mat = Matrix::from([[2.0, 4.0], [1.0, 3.0]]);
+        let ref_mat = mat.row_echelon();
+        assert_eq!(ref_mat.data, vec![1.0, 2.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn test_matrix_with_zero_row() {
+        let mut mat = Matrix::from([[1.0, 2.0], [0.0, 0.0]]);
+        let ref_mat = mat.row_echelon();
+        assert_eq!(ref_mat.data, vec![1.0, 2.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_rectangular_matrix() {
+        let mut mat = Matrix::from([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+        let ref_mat = mat.row_echelon();
+        println!("Output: \n{}", ref_mat);
+        assert_eq!(ref_mat.data, vec![1.0, 2.0, 3.0, 0.0, 1.0, 2.0]);
+    }
+
+    #[test]
+    fn test_requires_row_swap() {
+        let mut mat = Matrix::from([[0.0, 2.0, 3.0], [1.0, 4.0, 5.0]]);
+        let ref_mat = mat.row_echelon();
+        assert_eq!(ref_mat.data, vec![1.0, 4.0, 5.0, 0.0, 1.0, 1.5]);
+    }
+
+    #[test]
+    fn test_3x3_example() {
+        let mut mat = Matrix::from([[2.0, 1.0, -1.0], [-3.0, -1.0, 2.0], [-2.0, 1.0, 2.0]]);
+        let ref_mat = mat.row_echelon();
+        let expected = vec![1.0, 0.5, -0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0];
+        for (a, b) in ref_mat.data.iter().zip(expected.iter()) {
+            assert!((a - b).abs() < 1e-6);
+        }
+    }
+
+    // ---------- determinant -----------
+    #[test]
+    fn test_1x1_matrix() {
+        let mut mat = Matrix::from([[5.0]]);
+        assert_eq!(mat.determinant(), 5.0);
+
+        let mut mat_zero = Matrix::from([[0.0]]);
+        assert_eq!(mat_zero.determinant(), 0.0);
+    }
+
+    #[test]
+    fn test_2x2_matrix() {
+        let mut mat = Matrix::from([[1.0, 2.0], [3.0, 4.0]]);
+        assert_eq!(mat.determinant(), -2.0);
+
+        let mut mat_singular = Matrix::from([[2.0, 4.0], [1.0, 2.0]]);
+        assert_eq!(mat_singular.determinant(), 0.0);
+    }
+
+    #[test]
+    fn test_3x3_matrix() {
+        let mut mat = Matrix::from([[1.0, 2.0, 3.0], [0.0, 1.0, 4.0], [5.0, 6.0, 0.0]]);
+        assert_eq!(mat.determinant(), 1.0);
+
+        let mut mat_singular = Matrix::from([[1.0, 2.0, 3.0], [2.0, 4.0, 6.0], [3.0, 6.0, 9.0]]);
+        assert_eq!(mat_singular.determinant(), 0.0);
+    }
+
+    #[test]
+    fn test_4x4_matrix() {
+        let mut mat = Matrix::from([
+            [1.0, 0.0, 2.0, -1.0],
+            [3.0, 0.0, 0.0, 5.0],
+            [2.0, 1.0, 4.0, -3.0],
+            [1.0, 0.0, 5.0, 0.0],
+        ]);
+        assert_eq!(mat.determinant(), 30.0);
+
+        let mut mat_singular = Matrix::from([
+            [1.0, 2.0, 3.0, 4.0],
+            [2.0, 4.0, 6.0, 8.0],
+            [3.0, 6.0, 9.0, 12.0],
+            [4.0, 8.0, 12.0, 16.0],
+        ]);
+        assert_eq!(mat_singular.determinant(), 0.0);
+    }
+
+    #[test]
+    fn test_identity_matrix_2() {
+        let mut mat = Matrix::from([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
+        assert_eq!(mat.determinant(), 1.0);
+
+        let mut mat4 = Matrix::from([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]);
+        assert_eq!(mat4.determinant(), 1.0);
+    }
+
+    #[test]
+    fn test_upper_triangular_matrix() {
+        let mut mat = Matrix::from([[2.0, 3.0, 1.0], [0.0, 5.0, 4.0], [0.0, 0.0, 6.0]]);
+        // Determinant is the product of diagonal elements: 2*5*6 = 60
+        assert_eq!(mat.determinant(), 60.0);
+    }
+
+    #[test]
+    fn test_lower_triangular_matrix() {
+        let mut mat = Matrix::from([[3.0, 0.0, 0.0], [2.0, 1.0, 0.0], [4.0, 5.0, 2.0]]);
+        // Determinant is the product of diagonal elements: 3*1*2 = 6
+        assert_eq!(mat.determinant(), 6.0);
+    }
+
+    #[test]
+    fn test_matrix_with_zero_determinant() {
+        let mut mat = Matrix::from([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
+        assert_eq!(mat.determinant(), 0.0); // Singular matrix
     }
 }
