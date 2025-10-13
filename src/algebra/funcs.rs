@@ -244,6 +244,23 @@ impl<K: Float> Matrix<K> {
 
         det
     }
+
+    pub fn inverse(&mut self) -> Result<Matrix<K>, String> {
+        assert_eq!(
+            self.cols, self.rows,
+            "Must be NxN matrix to calculate inverse at Matrix::inverse()!"
+        );
+
+        let det: K = self.determinant();
+
+        let mut inverse = self.clone();
+
+        for i in inverse.data.iter_mut() {
+            *i = *i / det;
+        }
+
+        Ok(inverse)
+    }
 }
 
 pub fn angle_cos<K: Float>(u: &Vector<K>, v: &Vector<K>) -> f32 {

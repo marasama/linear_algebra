@@ -1,4 +1,4 @@
-use num_traits::{Float, NumCast};
+use num_traits::Float;
 use std::{
     fmt::{self, Display},
     ops::{AddAssign, MulAssign, SubAssign},
